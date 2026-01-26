@@ -13,10 +13,23 @@ import 'dotenv/config';
 import axios from 'axios';
 import * as fs from 'fs';
 import * as path from 'path';
-import { AggregatedCosts, CostsResponse, CostBucket, DailyCost, ReportConfig } from './types.js';
+import {
+  AggregatedCosts,
+  ClaudeCostReport,
+  ClaudeCostBucket,
+  CostBucket,
+  CostsResponse,
+  DailyCost,
+  type ClaudeReportConfig,
+  type OpenAIReportConfig,
+  type ReportConfig,
+  type Provider,
+} from './types.js';
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const OPENAI_API_BASE = 'https://api.openai.com/v1';
+const ANTHROPIC_API_BASE = 'https://api.anthropic.com/v1';
+const ANTHROPIC_VERSION = '2023-06-01';
 
 export function parseDate(dateStr: string): Date {
   if (!DATE_PATTERN.test(dateStr)) {
@@ -48,48 +61,70 @@ export function toUnixTimestamp(date: Date): number {
   return Math.floor(date.getTime() / 1000);
 }
 
-export function parseArguments(): { startDate: string; endDate: string } {
-  const args = process.argv.slice(2);
+const USAGE =
+  'Usage: yarn report YYYY-MM-DD YYYY-MM-DD [--provider openai|claude]\n' +
+  'Example: yarn report 2024-01-01 2024-01-31\n' +
+  'Example: yarn report 2024-01-01 2024-01-31 --provider claude';
 
-  if (args.length !== 2) {
-    throw new Error(
-      'Invalid arguments\n' +
-        'Usage: yarn report YYYY-MM-DD YYYY-MM-DD\n' +
-        'Example: yarn report 2024-01-01 2024-01-31'
-    );
+export function parseArguments(): { startDate: string; endDate: string; provider: Provider } {
+  const args = process.argv.slice(2);
+  const providerIdx = args.indexOf('--provider');
+  const providerArg = providerIdx >= 0 && args[providerIdx + 1] != null ? args[providerIdx + 1] : null;
+  const filtered =
+    providerIdx < 0
+      ? args
+      : args.filter((_, i) => i !== providerIdx && i !== providerIdx + 1);
+
+  if (filtered.length !== 2) {
+    throw new Error(`Invalid arguments\n${USAGE}`);
   }
 
-  const [startDate, endDate] = args;
+  const provider: Provider =
+    providerArg === 'claude' ? 'claude' : providerArg === 'openai' ? 'openai' : 'openai';
+  if (providerArg != null && providerArg !== 'openai' && providerArg !== 'claude') {
+    throw new Error(`Invalid --provider: ${providerArg}. Use openai or claude.\n${USAGE}`);
+  }
+
+  const [startDate, endDate] = filtered;
   const start = parseDate(startDate);
   const end = parseDate(endDate);
   validateDateRange(start, end);
 
-  return { startDate, endDate };
+  return { startDate, endDate, provider };
 }
 
-export function loadConfig(startDate: string, endDate: string): ReportConfig {
-  const requiredVars = [
-    'OPENAI_ADMIN_KEY',
-    'OPENAI_ORG_ID',
-    'OPENAI_PROJECT_ID',
-  ];
-
-  for (const varName of requiredVars) {
-    if (!process.env[varName]) {
-      throw new Error(`Missing required environment variable: ${varName}`);
+export function loadConfig(
+  startDate: string,
+  endDate: string,
+  provider: Provider
+): ReportConfig {
+  if (provider === 'openai') {
+    const required = ['OPENAI_ADMIN_KEY', 'OPENAI_ORG_ID', 'OPENAI_PROJECT_ID'];
+    for (const v of required) {
+      if (!process.env[v]) throw new Error(`Missing required environment variable: ${v}`);
     }
+    return {
+      provider: 'openai',
+      startDate,
+      endDate,
+      apiKey: process.env.OPENAI_ADMIN_KEY!,
+      orgId: process.env.OPENAI_ORG_ID!,
+      projectId: process.env.OPENAI_PROJECT_ID!,
+    };
   }
 
+  if (!process.env.ANTHROPIC_ADMIN_API_KEY) {
+    throw new Error('Missing required environment variable: ANTHROPIC_ADMIN_API_KEY');
+  }
   return {
+    provider: 'claude',
     startDate,
     endDate,
-    apiKey: process.env.OPENAI_ADMIN_KEY!,
-    orgId: process.env.OPENAI_ORG_ID!,
-    projectId: process.env.OPENAI_PROJECT_ID!,
+    apiKey: process.env.ANTHROPIC_ADMIN_API_KEY,
   };
 }
 
-export async function fetchCosts(config: ReportConfig): Promise<CostBucket[]> {
+export async function fetchCosts(config: OpenAIReportConfig): Promise<CostBucket[]> {
   const allBuckets: CostBucket[] = [];
   let nextPage: string | null = null;
 
@@ -97,7 +132,7 @@ export async function fetchCosts(config: ReportConfig): Promise<CostBucket[]> {
   const endTime = toUnixTimestamp(parseDate(config.endDate));
 
   do {
-    const params: Record<string, any> = {
+    const params: Record<string, unknown> = {
       start_time: startTime,
       end_time: endTime,
       project_ids: [config.projectId],
@@ -124,7 +159,69 @@ export async function fetchCosts(config: ReportConfig): Promise<CostBucket[]> {
 
     allBuckets.push(...response.data.data);
     nextPage = response.data.has_more ? response.data.next_page : null;
+  } while (nextPage);
 
+  return allBuckets;
+}
+
+function toRfc3339(dateStr: string): string {
+  return new Date(dateStr + 'T00:00:00Z').toISOString();
+}
+
+function claudeBucketToCostBucket(b: ClaudeCostBucket): CostBucket {
+  const startMs = new Date(b.starting_at).getTime();
+  const endMs = new Date(b.ending_at).getTime();
+  return {
+    object: 'bucket',
+    start_time: Math.floor(startMs / 1000),
+    end_time: Math.floor(endMs / 1000),
+    results: b.results.map((r) => {
+      const costUsd = parseFloat(r.amount) / 100;
+      const lineItem =
+        (r.description ?? [r.model, r.cost_type].filter(Boolean).join(' ')) || 'unknown';
+      return {
+        object: 'organization.costs.result' as const,
+        amount: { value: costUsd, currency: r.currency },
+        line_item: lineItem,
+        project_id: null,
+      };
+    }),
+  };
+}
+
+export async function fetchClaudeCosts(config: ClaudeReportConfig): Promise<CostBucket[]> {
+  const allBuckets: CostBucket[] = [];
+  let nextPage: string | null = null;
+  const startingAt = toRfc3339(config.startDate);
+  const endingAt = toRfc3339(config.endDate);
+
+  do {
+    const params: Record<string, unknown> = {
+      starting_at: startingAt,
+      ending_at: endingAt,
+      bucket_width: '1d',
+      limit: 31,
+      'group_by[]': ['description'],
+    };
+    if (nextPage) {
+      params.page = nextPage;
+    }
+
+    const response = await axios.get<ClaudeCostReport>(
+      `${ANTHROPIC_API_BASE}/organizations/cost_report`,
+      {
+        params,
+        headers: {
+          'x-api-key': config.apiKey,
+          'anthropic-version': ANTHROPIC_VERSION,
+        },
+      }
+    );
+
+    for (const b of response.data.data) {
+      allBuckets.push(claudeBucketToCostBucket(b));
+    }
+    nextPage = response.data.has_more ? response.data.next_page : null;
   } while (nextPage);
 
   return allBuckets;
@@ -180,11 +277,14 @@ export function aggregateCosts(
   };
 }
 
-export function generateMarkdownReport(aggregated: AggregatedCosts, orgId: string): string {
+export function generateMarkdownReport(
+  aggregated: AggregatedCosts,
+  orgId: string,
+  provider: 'openai' | 'claude'
+): string {
   const lines: string[] = [];
-
-  // Header
-  lines.push('# OpenAI API Usage Report');
+  const title = provider === 'claude' ? 'Claude API Usage Report' : 'OpenAI API Usage Report';
+  lines.push(`# ${title}`);
   lines.push('');
 
   // Format dates
@@ -303,34 +403,45 @@ function escapeCSV(value: string): string {
   return value;
 }
 
-function ensureReportsDirectory() {
-  const reportsDir = path.join(process.cwd(), 'reports', 'openai');
+function ensureReportsDirectory(provider: Provider, baseDir?: string): string {
+  const root = baseDir ?? process.cwd();
+  const dir = provider === 'claude' ? 'claude' : 'openai';
+  const reportsDir = path.join(root, 'reports', dir);
   if (!fs.existsSync(reportsDir)) {
     fs.mkdirSync(reportsDir, { recursive: true });
   }
   return reportsDir;
 }
 
-function writeReports(aggregated: AggregatedCosts, orgId: string): { mdPath: string; csvPath: string } {
-  const reportsDir = ensureReportsDirectory();
+export function writeReports(
+  aggregated: AggregatedCosts,
+  orgId: string,
+  provider: Provider,
+  baseDir?: string
+): { mdPath: string; csvPath: string } {
+  const reportsDir = ensureReportsDirectory(provider, baseDir);
 
   const baseFilename = `usage-${aggregated.startDate}-to-${aggregated.endDate}`;
   const mdPath = path.join(reportsDir, `${baseFilename}.md`);
   const csvPath = path.join(reportsDir, `${baseFilename}.csv`);
 
-  // Generate reports
-  const markdown = generateMarkdownReport(aggregated, orgId);
+  const markdown = generateMarkdownReport(aggregated, orgId, provider);
   const csv = generateCSVReport(aggregated);
 
-  // Write files
   fs.writeFileSync(mdPath, markdown, 'utf8');
   fs.writeFileSync(csvPath, csv, 'utf8');
 
   return { mdPath, csvPath };
 }
 
-function displayTerminalSummary(aggregated: AggregatedCosts, mdPath: string, csvPath: string) {
-  console.log('OpenAI API Usage Report');
+function displayTerminalSummary(
+  aggregated: AggregatedCosts,
+  mdPath: string,
+  csvPath: string,
+  provider: Provider
+) {
+  const title = provider === 'claude' ? 'Claude API Usage Report' : 'OpenAI API Usage Report';
+  console.log(title);
   console.log('=======================');
   console.log(`Period: ${aggregated.startDate} to ${aggregated.endDate}`);
   console.log(`Project: ${aggregated.projectId}\n`);
@@ -357,22 +468,27 @@ function displayTerminalSummary(aggregated: AggregatedCosts, mdPath: string, csv
 }
 
 async function main() {
-  console.log('OpenAI API Usage Report');
-  console.log('=======================\n');
-
   try {
-    const { startDate, endDate } = parseArguments();
-    const config = loadConfig(startDate, endDate);
+    const { startDate, endDate, provider } = parseArguments();
+    const config = loadConfig(startDate, endDate, provider);
 
+    const title = provider === 'claude' ? 'Claude API Usage Report' : 'OpenAI API Usage Report';
+    console.log(title);
+    console.log('=======================\n');
     console.log(`Fetching costs from ${startDate} to ${endDate}...`);
 
-    const buckets = await fetchCosts(config);
+    const buckets =
+      config.provider === 'openai'
+        ? await fetchCosts(config)
+        : await fetchClaudeCosts(config);
     console.log(`Received ${buckets.length} daily buckets\n`);
 
-    const aggregated = aggregateCosts(buckets, startDate, endDate, config.projectId);
-    const { mdPath, csvPath } = writeReports(aggregated, config.orgId);
+    const projectId = config.provider === 'openai' ? config.projectId : 'default';
+    const orgId = config.provider === 'openai' ? config.orgId : 'default';
+    const aggregated = aggregateCosts(buckets, startDate, endDate, projectId);
+    const { mdPath, csvPath } = writeReports(aggregated, orgId, provider);
     console.log('');
-    displayTerminalSummary(aggregated, mdPath, csvPath);
+    displayTerminalSummary(aggregated, mdPath, csvPath, provider);
   } catch (error) {
     if (error instanceof Error) {
       console.error('Error:', error.message);
@@ -382,6 +498,8 @@ async function main() {
         console.error('\nHint: Make sure OPENAI_ORG_ID is set in your environment.');
       } else if (error.message.includes('OPENAI_PROJECT_ID')) {
         console.error('\nHint: Make sure OPENAI_PROJECT_ID is set in your environment.');
+      } else if (error.message.includes('ANTHROPIC_ADMIN_API_KEY')) {
+        console.error('\nHint: Make sure ANTHROPIC_ADMIN_API_KEY is set in your environment.');
       }
     }
     process.exit(1);
