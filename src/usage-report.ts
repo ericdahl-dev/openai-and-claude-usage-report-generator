@@ -1,6 +1,6 @@
 /**
  * Core Implementation Functions
- * 
+ *
  * Contains all the core functionality for fetching costs, aggregating data,
  * and generating reports. This module is used by both the CLI and library entry points.
  */
@@ -452,4 +452,14 @@ export function writeReports(
   fs.writeFileSync(jsonPath, json, 'utf8');
 
   return { mdPath, csvPath, jsonPath };
+}
+
+export async function postJSONReport(jsonReport: string, url: string): Promise<void> {
+  const jsonData = JSON.parse(jsonReport);
+  
+  await axios.post(url, jsonData, {
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
 }

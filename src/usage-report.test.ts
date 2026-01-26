@@ -76,6 +76,7 @@ describe('parseArguments', () => {
       startDate: '2024-01-01',
       endDate: '2024-01-31',
       provider: 'openai',
+      postUrl: undefined,
     });
   });
 
@@ -84,6 +85,7 @@ describe('parseArguments', () => {
       startDate: '2024-01-01',
       endDate: '2024-01-31',
       provider: 'claude',
+      postUrl: undefined,
     });
   });
 
@@ -92,6 +94,25 @@ describe('parseArguments', () => {
       startDate: '2024-01-01',
       endDate: '2024-01-31',
       provider: 'openai',
+      postUrl: undefined,
+    });
+  });
+
+  it('parses --post-url', () => {
+    expect(runWithArgv(['2024-01-01', '2024-01-31', '--post-url', 'https://example.com/api'])).toEqual({
+      startDate: '2024-01-01',
+      endDate: '2024-01-31',
+      provider: 'openai',
+      postUrl: 'https://example.com/api',
+    });
+  });
+
+  it('parses --provider and --post-url together', () => {
+    expect(runWithArgv(['2024-01-01', '2024-01-31', '--provider', 'claude', '--post-url', 'https://example.com/api'])).toEqual({
+      startDate: '2024-01-01',
+      endDate: '2024-01-31',
+      provider: 'claude',
+      postUrl: 'https://example.com/api',
     });
   });
 
@@ -305,30 +326,30 @@ describe('generateJSONReport', () => {
     };
     const json = generateJSONReport(a, 'org-x', 'openai');
     const parsed = JSON.parse(json);
-    
+
     expect(parsed.metadata).toBeDefined();
     expect(parsed.metadata.provider).toBe('openai');
     expect(parsed.metadata.projectId).toBe('proj_1');
     expect(parsed.metadata.organizationId).toBe('org-x');
     expect(parsed.metadata.billingPeriod.startDate).toBe('2024-01-01');
     expect(parsed.metadata.billingPeriod.endDate).toBe('2024-01-31');
-    
+
     expect(parsed.summary).toBeDefined();
     expect(parsed.summary.totalCost).toBe(5);
     expect(parsed.summary.billingDays).toBe(1);
     expect(parsed.summary.averageDailyCost).toBe(5);
-    
+
     expect(parsed.costsByLineItem).toBeDefined();
     expect(Array.isArray(parsed.costsByLineItem)).toBe(true);
     expect(parsed.costsByLineItem.length).toBe(2);
     expect(parsed.costsByLineItem[0].lineItem).toBe('gpt-4');
     expect(parsed.costsByLineItem[0].cost).toBe(3);
     expect(parsed.costsByLineItem[0].percentage).toBe(60);
-    
+
     expect(parsed.dailyBreakdown).toBeDefined();
     expect(Array.isArray(parsed.dailyBreakdown)).toBe(true);
     expect(parsed.dailyBreakdown.length).toBe(2);
-    
+
     expect(parsed.dailyTotals).toBeDefined();
     expect(Array.isArray(parsed.dailyTotals)).toBe(true);
     expect(parsed.dailyTotals.length).toBe(1);
@@ -722,5 +743,81 @@ describe('writeReports', () => {
     } finally {
       fs.rmSync(tmp, { recursive: true });
     }
+  });
+});
+
+describe('postJSONReport', () => {
+  const mockAxiosPost = vi.mocked(axios.post);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('posts JSON report to the specified URL', async () => {
+    const jsonReport = '{"metadata": {"provider": "openai"}}';
+    const url = 'https://example.com/api/reports';
+    
+    mockAxiosPost.mockResolvedValueOnce({ status: 200, data: { success: true } });
+
+    const { postJSONReport } = await import('./usage-report.js');
+    await postJSONReport(jsonReport, url);
+
+    expect(mockAxiosPost).toHaveBeenCalledTimes(1);
+    expect(mockAxiosPost).toHaveBeenCalledWith(
+      url,
+      JSON.parse(jsonReport),
+      {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+  });
+
+  it('throws error when POST request fails', async () => {
+    const jsonReport = '{"metadata": {"provider": "openai"}}';
+    const url = 'https://example.com/api/reports';
+    
+    const error = new Error('Network error');
+    mockAxiosPost.mockRejectedValueOnce(error);
+
+    const { postJSONReport } = await import('./usage-report.js');
+    await expect(postJSONReport(jsonReport, url)).rejects.toThrow('Network error');
+  });
+
+  it('handles non-200 status codes', async () => {
+    const jsonReport = '{"metadata": {"provider": "openai"}}';
+    const url = 'https://example.com/api/reports';
+    
+    mockAxiosPost.mockResolvedValueOnce({ status: 500, data: { error: 'Server error' } });
+
+    const { postJSONReport } = await import('./usage-report.js');
+    // Should not throw for non-200, but we can check the response
+    await postJSONReport(jsonReport, url);
+    
+    expect(mockAxiosPost).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends valid JSON payload', async () => {
+    const jsonReport = JSON.stringify({
+      metadata: { provider: 'openai' },
+      summary: { totalCost: 100 },
+    });
+    const url = 'https://example.com/api/reports';
+    
+    mockAxiosPost.mockResolvedValueOnce({ status: 200, data: { success: true } });
+
+    const { postJSONReport } = await import('./usage-report.js');
+    await postJSONReport(jsonReport, url);
+
+    expect(mockAxiosPost).toHaveBeenCalledWith(
+      url,
+      { metadata: { provider: 'openai' }, summary: { totalCost: 100 } },
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+        }),
+      })
+    );
   });
 });
