@@ -1,19 +1,19 @@
 # OpenAI Usage Report Generator
 
-A standalone tool for generating billing reports from the OpenAI organization costs API. Generates both Markdown (readable) and CSV (data) format reports.
+A standalone tool for generating billing reports from the **OpenAI** or **Claude (Anthropic)** cost APIs. Outputs Markdown (readable) and CSV (data) reports.
 
 ## Features
 
-- Fetches usage data from OpenAI's organization costs API
+- Fetches usage/cost data from OpenAI's organization costs API or Anthropic's [Usage and Cost API](https://platform.claude.com/docs/en/build-with-claude/usage-cost-api)
 - Generates detailed Markdown reports with summaries and breakdowns
 - Exports CSV data for further analysis
 - Daily and line-item cost breakdowns
 
 ## Prerequisites
 
-- Node.js 18+ and Yarn
-- OpenAI API admin key with access to organization costs API
-- OpenAI Organization ID and Project ID
+- Node.js 18+ and Yarn (`.nvmrc` specifies 22)
+- **OpenAI**: API admin key, Organization ID, and Project ID
+- **Claude**: Anthropic **Admin API key** (`sk-ant-admin...`). Standard API keys do not work; create one in [Console → Settings → Admin keys](https://console.anthropic.com/settings/admin-keys).
 
 ## Installation
 
@@ -23,7 +23,9 @@ yarn install
 
 ## Configuration
 
-Create a `.env` file in the root directory with the following variables:
+Create a `.env` file in the root directory (see `.env.example` for a template).
+
+**OpenAI** (default):
 
 ```env
 OPENAI_ADMIN_KEY=sk-...
@@ -31,20 +33,31 @@ OPENAI_ORG_ID=org-...
 OPENAI_PROJECT_ID=proj_...
 ```
 
+**Claude**:
+
+```env
+ANTHROPIC_ADMIN_API_KEY=sk-ant-admin-...
+```
+
 ## Usage
 
-Generate a report for a date range:
+Generate a report for a date range. Default provider is OpenAI.
 
 ```bash
 yarn report 2024-01-01 2024-01-31
+yarn report 2024-01-01 2024-01-31 --provider openai
+yarn report 2024-01-01 2024-01-31 --provider claude
 ```
 
 ## Output
 
-Reports are generated in the `reports/openai/` directory:
+- **OpenAI**: `reports/openai/`
+- **Claude**: `reports/claude/`
 
-- `usage-YYYY-MM-DD-to-YYYY-MM-DD.md` - Human-readable Markdown report
-- `usage-YYYY-MM-DD-to-YYYY-MM-DD.csv` - CSV data export
+Each run produces:
+
+- `usage-YYYY-MM-DD-to-YYYY-MM-DD.md` – Human-readable Markdown report
+- `usage-YYYY-MM-DD-to-YYYY-MM-DD.csv` – CSV data export
 
 ## Report Contents
 
@@ -63,7 +76,8 @@ The CSV export contains:
 ### Running Tests
 
 ```bash
-yarn test
+yarn test        # watch mode
+yarn test:run    # single run (used by CI)
 ```
 
 ### Building
@@ -71,4 +85,8 @@ yarn test
 ```bash
 yarn build
 ```
+
+### CI
+
+GitHub Actions runs on push and pull requests to `main`: `yarn install --frozen-lockfile`, `yarn test:run`, then `yarn build`. See [.github/workflows/ci.yml](.github/workflows/ci.yml).
 
