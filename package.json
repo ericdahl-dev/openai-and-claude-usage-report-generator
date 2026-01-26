@@ -1,25 +1,44 @@
 {
   "name": "openai-usage-report",
   "version": "1.0.0",
-  "description": "OpenAI API Usage Report Generator - Generates billing reports from OpenAI organization costs API",
-  "main": "src/usage-report.ts",
+  "description": "OpenAI and Claude API Usage Report Generator - CLI tool and library for generating billing reports",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "type": "module",
-  "bin": {
-    "openai-usage-report": "./src/usage-report.ts"
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./cli": {
+      "import": "./dist/cli.js",
+      "types": "./dist/cli.d.ts"
+    }
   },
+  "bin": {
+    "openai-usage-report": "./src/cli.ts"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
-    "report": "tsx src/usage-report.ts",
+    "report": "tsx src/cli.ts",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:run": "vitest run",
-    "build": "tsc"
+    "build": "tsc",
+    "prepublishOnly": "yarn test:run && yarn build"
   },
   "keywords": [
     "openai",
+    "claude",
+    "anthropic",
     "usage",
     "report",
     "billing",
-    "api"
+    "api",
+    "cost-tracking"
   ],
   "author": "",
   "license": "ISC",
