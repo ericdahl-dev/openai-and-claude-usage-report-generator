@@ -11,7 +11,7 @@ A standalone tool for generating billing reports from the **OpenAI** or **Claude
 
 ## Prerequisites
 
-- Node.js 18+ and Yarn
+- Node.js 18+ and Yarn (`.nvmrc` specifies 22)
 - **OpenAI**: API admin key, Organization ID, and Project ID
 - **Claude**: Anthropic **Admin API key** (`sk-ant-admin...`). Standard API keys do not work; create one in [Console → Settings → Admin keys](https://console.anthropic.com/settings/admin-keys).
 
@@ -23,7 +23,7 @@ yarn install
 
 ## Configuration
 
-Create a `.env` file in the root directory.
+Create a `.env` file in the root directory (see `.env.example` for a template).
 
 **OpenAI** (default):
 
@@ -76,7 +76,8 @@ The CSV export contains:
 ### Running Tests
 
 ```bash
-yarn test
+yarn test        # watch mode
+yarn test:run    # single run (used by CI)
 ```
 
 ### Building
@@ -84,4 +85,8 @@ yarn test
 ```bash
 yarn build
 ```
+
+### CI
+
+GitHub Actions runs on push and pull requests to `main`: `yarn install --frozen-lockfile`, `yarn test:run`, then `yarn build`. See [.github/workflows/ci.yml](.github/workflows/ci.yml).
 

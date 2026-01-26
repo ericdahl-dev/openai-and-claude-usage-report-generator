@@ -1,12 +1,12 @@
 #!/usr/bin/env tsx
 
 /**
- * OpenAI API Usage Report Generator
+ * OpenAI / Claude API Usage Report Generator
  *
- * Generates client billing reports from OpenAI organization costs API.
+ * Generates billing reports from OpenAI organization costs API or Anthropic Cost API.
  * Outputs: Markdown (readable) and CSV (data) formats.
  *
- * Usage: yarn report YYYY-MM-DD YYYY-MM-DD
+ * Usage: yarn report YYYY-MM-DD YYYY-MM-DD [--provider openai|claude]
  */
 
 import 'dotenv/config';
