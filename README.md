@@ -72,6 +72,3 @@ yarn test
 yarn build
 ```
 
-## License
-
-ISC
