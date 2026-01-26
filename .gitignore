@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.env
+.env.local
+reports/openai/*.md
+reports/openai/*.csv
+coverage/
+*.log
+.DS_Store
