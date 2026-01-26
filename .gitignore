@@ -4,8 +4,13 @@ dist/
 .env.local
 reports/openai/*.md
 reports/openai/*.csv
+reports/openai/*.json
+reports/claude/*.md
+reports/claude/*.csv
+reports/claude/*.json
 coverage/
 *.log
 .DS_Store
 .cursor/mcp.json
 /.cursor
+/reports

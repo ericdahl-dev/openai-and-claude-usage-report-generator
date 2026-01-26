@@ -11,6 +11,7 @@ Can be used as:
 - Fetches usage/cost data from OpenAI's organization costs API or Anthropic's [Usage and Cost API](https://platform.claude.com/docs/en/build-with-claude/usage-cost-api)
 - Generates detailed Markdown reports with summaries and breakdowns
 - Exports CSV data for further analysis
+- Exports JSON data for programmatic consumption
 - Daily and line-item cost breakdowns
 
 ## Prerequisites
@@ -36,9 +37,9 @@ yarn install
 ### As an npm Package (Library)
 
 ```bash
-yarn add openai-and-claude-usage-report-generator
+yarn add @ericdahl.dev/openai-and-claude-usage-report-generator
 # or
-npm install openai-and-claude-usage-report-generator
+npm install @ericdahl.dev/openai-and-claude-usage-report-generator
 ```
 
 ## Configuration
@@ -84,12 +85,13 @@ import {
   aggregateCosts,
   generateMarkdownReport,
   generateCSVReport,
+  generateJSONReport,
   writeReports,
   parseDate,
   validateDateRange,
   loadConfig,
-} from 'openai-and-claude-usage-report-generator';
-import type { OpenAIReportConfig, ClaudeReportConfig } from 'openai-and-claude-usage-report-generator';
+} from '@ericdahl.dev/openai-and-claude-usage-report-generator';
+import type { OpenAIReportConfig, ClaudeReportConfig } from '@ericdahl.dev/openai-and-claude-usage-report-generator';
 
 // Example: Fetch and process OpenAI costs
 // Note: OPENAI_ADMIN_KEY must be an admin key, not a standard API key
@@ -117,11 +119,12 @@ async function generateOpenAIReport() {
   // Generate reports
   const markdown = generateMarkdownReport(aggregated, config.orgId, 'openai');
   const csv = generateCSVReport(aggregated);
+  const json = generateJSONReport(aggregated, config.orgId, 'openai');
   
   // Or write directly to files
-  const { mdPath, csvPath } = writeReports(aggregated, config.orgId, 'openai');
+  const { mdPath, csvPath, jsonPath } = writeReports(aggregated, config.orgId, 'openai');
   
-  console.log(`Reports written to ${mdPath} and ${csvPath}`);
+  console.log(`Reports written to ${mdPath}, ${csvPath}, and ${jsonPath}`);
 }
 
 // Example: Fetch and process Claude costs
@@ -155,6 +158,7 @@ Each run produces:
 
 - `usage-YYYY-MM-DD-to-YYYY-MM-DD.md` – Human-readable Markdown report
 - `usage-YYYY-MM-DD-to-YYYY-MM-DD.csv` – CSV data export
+- `usage-YYYY-MM-DD-to-YYYY-MM-DD.json` – JSON data export for programmatic consumption
 
 ## Report Contents
 
@@ -167,6 +171,13 @@ The Markdown report includes:
 
 The CSV export contains:
 - Date, line item, cost (USD), and project ID for each entry
+
+The JSON export contains:
+- Metadata (provider, billing period, project/organization IDs, generation timestamp)
+- Summary (total cost, billing days, average daily cost)
+- Costs by line item (sorted by cost, includes percentages)
+- Daily breakdown (all daily costs by date and line item)
+- Daily totals (aggregated totals per day)
 
 ## API Reference
 
@@ -187,8 +198,11 @@ Generates a human-readable Markdown report from aggregated costs.
 #### `generateCSVReport(aggregated: AggregatedCosts): string`
 Generates a CSV report from aggregated costs.
 
-#### `writeReports(aggregated: AggregatedCosts, orgId: string, provider: Provider, baseDir?: string): { mdPath: string; csvPath: string }`
-Writes both Markdown and CSV reports to disk. Returns paths to the generated files.
+#### `generateJSONReport(aggregated: AggregatedCosts, orgId: string, provider: 'openai' | 'claude'): string`
+Generates a JSON report from aggregated costs. Returns a formatted JSON string with metadata, summary, costs by line item, daily breakdown, and daily totals.
+
+#### `writeReports(aggregated: AggregatedCosts, orgId: string, provider: Provider, baseDir?: string): { mdPath: string; csvPath: string; jsonPath: string }`
+Writes Markdown, CSV, and JSON reports to disk. Returns paths to the generated files.
 
 ### Utility Functions
 

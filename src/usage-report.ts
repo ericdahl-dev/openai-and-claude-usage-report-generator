@@ -358,6 +358,61 @@ export function generateCSVReport(aggregated: AggregatedCosts): string {
   return lines.join('\n') + '\n';
 }
 
+export function generateJSONReport(aggregated: AggregatedCosts, orgId: string, provider: 'openai' | 'claude'): string {
+  // Convert Map to array of objects for JSON serialization
+  const costsByLineItem = Array.from(aggregated.costsByLineItem.entries())
+    .map(([lineItem, cost]) => ({
+      lineItem,
+      cost,
+      percentage: aggregated.totalCost > 0 ? (cost / aggregated.totalCost * 100) : 0,
+    }))
+    .sort((a, b) => b.cost - a.cost);
+
+  // Calculate daily totals
+  const dailyTotals = new Map<string, number>();
+  for (const daily of aggregated.dailyCosts) {
+    const current = dailyTotals.get(daily.date) || 0;
+    dailyTotals.set(daily.date, current + daily.cost);
+  }
+
+  const dailyTotalsArray = Array.from(dailyTotals.entries())
+    .map(([date, total]) => ({ date, total }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const json = {
+    metadata: {
+      provider,
+      generated: new Date().toISOString(),
+      billingPeriod: {
+        startDate: aggregated.startDate,
+        endDate: aggregated.endDate,
+      },
+      projectId: aggregated.projectId,
+      organizationId: orgId,
+    },
+    summary: {
+      totalCost: aggregated.totalCost,
+      billingDays: aggregated.billingDays,
+      averageDailyCost: aggregated.averageDailyCost,
+    },
+    costsByLineItem,
+    dailyBreakdown: aggregated.dailyCosts
+      .map(d => ({
+        date: d.date,
+        lineItem: d.lineItem,
+        cost: d.cost,
+      }))
+      .sort((a, b) => {
+        const dateCompare = a.date.localeCompare(b.date);
+        if (dateCompare !== 0) return dateCompare;
+        return a.lineItem.localeCompare(b.lineItem);
+      }),
+    dailyTotals: dailyTotalsArray,
+  };
+
+  return JSON.stringify(json, null, 2) + '\n';
+}
+
 function escapeCSV(value: string): string {
   if (value.includes(',') || value.includes('"') || value.includes('\n')) {
     return `"${value.replace(/"/g, '""')}"`;
@@ -380,18 +435,21 @@ export function writeReports(
   orgId: string,
   provider: Provider,
   baseDir?: string
-): { mdPath: string; csvPath: string } {
+): { mdPath: string; csvPath: string; jsonPath: string } {
   const reportsDir = ensureReportsDirectory(provider, baseDir);
 
   const baseFilename = `usage-${aggregated.startDate}-to-${aggregated.endDate}`;
   const mdPath = path.join(reportsDir, `${baseFilename}.md`);
   const csvPath = path.join(reportsDir, `${baseFilename}.csv`);
+  const jsonPath = path.join(reportsDir, `${baseFilename}.json`);
 
   const markdown = generateMarkdownReport(aggregated, orgId, provider);
   const csv = generateCSVReport(aggregated);
+  const json = generateJSONReport(aggregated, orgId, provider);
 
   fs.writeFileSync(mdPath, markdown, 'utf8');
   fs.writeFileSync(csvPath, csv, 'utf8');
+  fs.writeFileSync(jsonPath, json, 'utf8');
 
-  return { mdPath, csvPath };
+  return { mdPath, csvPath, jsonPath };
 }

@@ -28,6 +28,7 @@ export {
   aggregateCosts,
   generateMarkdownReport,
   generateCSVReport,
+  generateJSONReport,
   writeReports,
   fetchOpenAICosts,
   fetchClaudeCosts,

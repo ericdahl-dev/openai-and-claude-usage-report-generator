@@ -14,6 +14,7 @@ import {
   fetchClaudeCosts,
   fetchOpenAICosts,
   generateCSVReport,
+  generateJSONReport,
   generateMarkdownReport,
   loadConfig,
   parseDate,
@@ -281,6 +282,74 @@ describe('generateCSVReport', () => {
     expect(csv).toContain('date,line_item,cost_usd,project_id');
     expect(csv).toContain('2024-01-01,gpt-3.5,2.00,default');
     expect(csv).toContain('2024-01-01,gpt-4,3.00,default');
+  });
+});
+
+describe('generateJSONReport', () => {
+  it('generates valid JSON with all required fields', () => {
+    const a: AggregatedCosts = {
+      totalCost: 5,
+      startDate: '2024-01-01',
+      endDate: '2024-01-31',
+      projectId: 'proj_1',
+      dailyCosts: [
+        { date: '2024-01-01', lineItem: 'gpt-4', cost: 3 },
+        { date: '2024-01-01', lineItem: 'gpt-3.5', cost: 2 },
+      ],
+      costsByLineItem: new Map([
+        ['gpt-4', 3],
+        ['gpt-3.5', 2],
+      ]),
+      billingDays: 1,
+      averageDailyCost: 5,
+    };
+    const json = generateJSONReport(a, 'org-x', 'openai');
+    const parsed = JSON.parse(json);
+    
+    expect(parsed.metadata).toBeDefined();
+    expect(parsed.metadata.provider).toBe('openai');
+    expect(parsed.metadata.projectId).toBe('proj_1');
+    expect(parsed.metadata.organizationId).toBe('org-x');
+    expect(parsed.metadata.billingPeriod.startDate).toBe('2024-01-01');
+    expect(parsed.metadata.billingPeriod.endDate).toBe('2024-01-31');
+    
+    expect(parsed.summary).toBeDefined();
+    expect(parsed.summary.totalCost).toBe(5);
+    expect(parsed.summary.billingDays).toBe(1);
+    expect(parsed.summary.averageDailyCost).toBe(5);
+    
+    expect(parsed.costsByLineItem).toBeDefined();
+    expect(Array.isArray(parsed.costsByLineItem)).toBe(true);
+    expect(parsed.costsByLineItem.length).toBe(2);
+    expect(parsed.costsByLineItem[0].lineItem).toBe('gpt-4');
+    expect(parsed.costsByLineItem[0].cost).toBe(3);
+    expect(parsed.costsByLineItem[0].percentage).toBe(60);
+    
+    expect(parsed.dailyBreakdown).toBeDefined();
+    expect(Array.isArray(parsed.dailyBreakdown)).toBe(true);
+    expect(parsed.dailyBreakdown.length).toBe(2);
+    
+    expect(parsed.dailyTotals).toBeDefined();
+    expect(Array.isArray(parsed.dailyTotals)).toBe(true);
+    expect(parsed.dailyTotals.length).toBe(1);
+    expect(parsed.dailyTotals[0].date).toBe('2024-01-01');
+    expect(parsed.dailyTotals[0].total).toBe(5);
+  });
+
+  it('works with claude provider', () => {
+    const a: AggregatedCosts = {
+      totalCost: 10,
+      startDate: '2024-01-01',
+      endDate: '2024-01-31',
+      projectId: 'default',
+      dailyCosts: [{ date: '2024-01-01', lineItem: 'claude-3-opus', cost: 10 }],
+      costsByLineItem: new Map([['claude-3-opus', 10]]),
+      billingDays: 1,
+      averageDailyCost: 10,
+    };
+    const json = generateJSONReport(a, 'default', 'claude');
+    const parsed = JSON.parse(json);
+    expect(parsed.metadata.provider).toBe('claude');
   });
 });
 
@@ -622,12 +691,16 @@ describe('writeReports', () => {
   it('writes to reports/openai when provider openai', () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'usage-report-'));
     try {
-      const { mdPath, csvPath } = writeReports(aggregated, 'org-x', 'openai', tmp);
+      const { mdPath, csvPath, jsonPath } = writeReports(aggregated, 'org-x', 'openai', tmp);
       expect(mdPath).toContain(path.join('reports', 'openai'));
       expect(csvPath).toContain(path.join('reports', 'openai'));
+      expect(jsonPath).toContain(path.join('reports', 'openai'));
       expect(fs.existsSync(mdPath)).toBe(true);
       expect(fs.existsSync(csvPath)).toBe(true);
+      expect(fs.existsSync(jsonPath)).toBe(true);
       expect(fs.readFileSync(mdPath, 'utf8')).toContain('# OpenAI API Usage Report');
+      const json = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+      expect(json.metadata.provider).toBe('openai');
     } finally {
       fs.rmSync(tmp, { recursive: true });
     }
@@ -636,12 +709,16 @@ describe('writeReports', () => {
   it('writes to reports/claude when provider claude', () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'usage-report-'));
     try {
-      const { mdPath, csvPath } = writeReports(aggregated, 'default', 'claude', tmp);
+      const { mdPath, csvPath, jsonPath } = writeReports(aggregated, 'default', 'claude', tmp);
       expect(mdPath).toContain(path.join('reports', 'claude'));
       expect(csvPath).toContain(path.join('reports', 'claude'));
+      expect(jsonPath).toContain(path.join('reports', 'claude'));
       expect(fs.existsSync(mdPath)).toBe(true);
       expect(fs.existsSync(csvPath)).toBe(true);
+      expect(fs.existsSync(jsonPath)).toBe(true);
       expect(fs.readFileSync(mdPath, 'utf8')).toContain('# Claude API Usage Report');
+      const json = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+      expect(json.metadata.provider).toBe('claude');
     } finally {
       fs.rmSync(tmp, { recursive: true });
     }

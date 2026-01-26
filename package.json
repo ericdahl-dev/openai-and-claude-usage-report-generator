@@ -1,5 +1,5 @@
 {
-  "name": "openai-and-claude-usage-report-generator",
+  "name": "@ericdahl.dev/openai-and-claude-usage-report-generator",
   "version": "1.0.3",
   "description": "OpenAI and Claude API Usage Report Generator - CLI tool and library for generating billing reports",
   "main": "./dist/index.js",
@@ -34,9 +34,9 @@
     "version:patch": "npm version patch && git push --follow-tags",
     "version:minor": "npm version minor && git push --follow-tags",
     "version:major": "npm version major && git push --follow-tags",
-    "release:patch": "npm run version:patch && npm publish",
-    "release:minor": "npm run version:minor && npm publish",
-    "release:major": "npm run version:major && npm publish"
+    "release:patch": "npm run version:patch && npm publish --access public",
+    "release:minor": "npm run version:minor && npm publish --access public",
+    "release:major": "npm run version:major && npm publish --access public"
   },
   "keywords": [
     "openai",

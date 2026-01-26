@@ -4,7 +4,7 @@
 
 1. **npm account**: Create one at https://www.npmjs.com/signup if you don't have one
 2. **Login to npm**: Run `npm login` in your terminal
-3. **Verify package name availability**: The name `openai-and-claude-usage-report-generator` is currently available
+3. **Verify package name availability**: The scoped package `@ericdahl.dev/openai-and-claude-usage-report-generator` is available under your organization
 
 ## Pre-Publishing Checklist
 
@@ -49,7 +49,7 @@ npm pack
 
 # This creates a .tgz file you can test
 # Install it in another project to test:
-# npm install /path/to/openai-and-claude-usage-report-generator-1.0.0.tgz
+# npm install /path/to/ericdahl.dev-openai-and-claude-usage-report-generator-1.0.0.tgz
 ```
 
 ### 4. Dry run (see what would be published)
@@ -63,18 +63,20 @@ This shows what files would be included without actually publishing.
 ### 5. Publish to npm
 
 ```bash
-npm publish
+npm publish --access public
 ```
+
+**Important**: Scoped packages are private by default. Use `--access public` to make it publicly available.
 
 For the first publish, this will publish version `1.0.0` as specified in `package.json`.
 
 ### 6. Verify publication
 
 ```bash
-npm view openai-and-claude-usage-report-generator
+npm view @ericdahl.dev/openai-and-claude-usage-report-generator
 ```
 
-Or visit: https://www.npmjs.com/package/openai-and-claude-usage-report-generator
+Or visit: https://www.npmjs.com/package/@ericdahl.dev/openai-and-claude-usage-report-generator
 
 ## Updating the Package
 
@@ -131,7 +133,7 @@ If you want more control:
 
 3. **Publish**:
    ```bash
-   npm publish
+   npm publish --access public
    ```
 
 ### Version Bump Only (No Publish)
@@ -164,12 +166,14 @@ Consider adding these fields before publishing:
 }
 ```
 
-## Publishing Scopes (Optional)
+## Publishing Scopes
 
-If you want to publish under a scope (e.g., `@yourname/openai-and-claude-usage-report-generator`):
+This package is published under the `@ericdahl.dev` scope. Scoped packages require:
 
-1. Update `package.json` name: `"name": "@yourname/openai-and-claude-usage-report-generator"`
+1. Package name in `package.json`: `"name": "@ericdahl.dev/openai-and-claude-usage-report-generator"`
 2. Publish with: `npm publish --access public` (scoped packages are private by default)
+
+The release scripts (`release:patch`, `release:minor`, `release:major`) automatically include `--access public`.
 
 ## Troubleshooting
 

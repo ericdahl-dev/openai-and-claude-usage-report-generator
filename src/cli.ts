@@ -58,6 +58,7 @@ function displayTerminalSummary(
   aggregated: AggregatedCosts,
   mdPath: string,
   csvPath: string,
+  jsonPath: string,
   provider: Provider
 ) {
   const title = provider === 'claude' ? 'Claude API Usage Report' : 'OpenAI API Usage Report';
@@ -85,6 +86,7 @@ function displayTerminalSummary(
   console.log('Reports generated:');
   console.log(`  - ${mdPath}`);
   console.log(`  - ${csvPath}`);
+  console.log(`  - ${jsonPath}`);
 }
 
 async function main() {
@@ -106,9 +108,9 @@ async function main() {
     const projectId = config.provider === 'openai' ? config.projectId : 'default';
     const orgId = config.provider === 'openai' ? config.orgId : 'default';
     const aggregated = aggregateCosts(buckets, startDate, endDate, projectId);
-    const { mdPath, csvPath } = writeReports(aggregated, orgId, provider);
+    const { mdPath, csvPath, jsonPath } = writeReports(aggregated, orgId, provider);
     console.log('');
-    displayTerminalSummary(aggregated, mdPath, csvPath, provider);
+    displayTerminalSummary(aggregated, mdPath, csvPath, jsonPath, provider);
   } catch (error) {
     if (error instanceof Error) {
       console.error('Error:', error.message);
