@@ -78,24 +78,72 @@ Or visit: https://www.npmjs.com/package/openai-and-claude-usage-report-generator
 
 ## Updating the Package
 
-For subsequent releases:
+For subsequent releases, use the convenient npm scripts:
 
-1. **Update version** in `package.json`:
-   - Patch: `npm version patch` (1.0.0 → 1.0.1)
-   - Minor: `npm version minor` (1.0.0 → 1.1.0)
-   - Major: `npm version major` (1.0.0 → 2.0.0)
+### Quick Release (Recommended)
 
-2. **Commit the version bump**:
+**One command to bump version, commit, tag, push, and publish:**
+
+```bash
+# Patch release (1.0.0 → 1.0.1) - bug fixes
+yarn release:patch
+
+# Minor release (1.0.0 → 1.1.0) - new features, backward compatible
+yarn release:minor
+
+# Major release (1.0.0 → 2.0.0) - breaking changes
+yarn release:major
+```
+
+This automatically:
+1. Bumps the version in `package.json`
+2. Creates a git commit with the version change
+3. Creates a git tag (e.g., `v1.0.1`)
+4. Pushes the commit and tag to GitHub
+5. Runs tests and builds (via `prepublishOnly`)
+6. Publishes to npm
+
+### Manual Version Bump (Alternative)
+
+If you want more control:
+
+1. **Bump version and create git tag**:
    ```bash
-   git add package.json
-   git commit -m "chore: bump version to X.Y.Z"
-   git push
+   # Patch: 1.0.0 → 1.0.1
+   npm version patch
+   
+   # Minor: 1.0.0 → 1.1.0
+   npm version minor
+   
+   # Major: 1.0.0 → 2.0.0
+   npm version major
+   ```
+
+   This automatically:
+   - Updates `package.json` version
+   - Creates a git commit
+   - Creates a git tag
+
+2. **Push the version commit and tag**:
+   ```bash
+   git push --follow-tags
    ```
 
 3. **Publish**:
    ```bash
    npm publish
    ```
+
+### Version Bump Only (No Publish)
+
+If you just want to bump the version without publishing:
+
+```bash
+# Bump version and push to git
+yarn version:patch   # or version:minor, version:major
+```
+
+This bumps the version, commits, tags, and pushes, but doesn't publish to npm.
 
 ## Recommended package.json additions
 
