@@ -12,15 +12,15 @@ import * as path from 'path';
 import {
   aggregateCosts,
   fetchClaudeCosts,
-  fetchCosts,
+  fetchOpenAICosts,
   generateCSVReport,
   generateMarkdownReport,
   loadConfig,
-  parseArguments,
   parseDate,
   validateDateRange,
   writeReports,
 } from './usage-report.js';
+import { parseArguments } from './cli.js';
 
 vi.mock('axios');
 
@@ -284,7 +284,7 @@ describe('generateCSVReport', () => {
   });
 });
 
-describe('fetchCosts (OpenAI)', () => {
+describe('fetchOpenAICosts (OpenAI)', () => {
   const mockCostsResponse = {
     data: {
       object: 'page',
@@ -325,7 +325,7 @@ describe('fetchCosts (OpenAI)', () => {
       orgId: 'org-x',
       projectId: 'proj_y',
     };
-    await fetchCosts(config);
+    await fetchOpenAICosts(config);
     expect(axios.get).toHaveBeenCalledWith(
       expect.stringContaining('/v1/organization/costs'),
       expect.objectContaining({
@@ -354,7 +354,7 @@ describe('fetchCosts (OpenAI)', () => {
       orgId: 'org-x',
       projectId: 'proj_y',
     };
-    const buckets = await fetchCosts(config);
+    const buckets = await fetchOpenAICosts(config);
     expect(buckets).toHaveLength(1);
     expect(buckets[0].results).toHaveLength(1);
     expect(buckets[0].results[0].amount.value).toBe(2.5);
@@ -405,7 +405,7 @@ describe('fetchCosts (OpenAI)', () => {
       orgId: 'org-x',
       projectId: 'proj_y',
     };
-    const buckets = await fetchCosts(config);
+    const buckets = await fetchOpenAICosts(config);
     expect(buckets).toHaveLength(2);
     expect(axios.get).toHaveBeenCalledTimes(2);
     expect(axios.get).toHaveBeenNthCalledWith(
