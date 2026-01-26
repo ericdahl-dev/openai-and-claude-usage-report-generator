@@ -1,5 +1,5 @@
 {
-  "name": "openai-usage-report",
+  "name": "openai-and-claude-usage-report-generator",
   "version": "1.0.0",
   "description": "OpenAI and Claude API Usage Report Generator - CLI tool and library for generating billing reports",
   "main": "./dist/index.js",
@@ -16,7 +16,8 @@
     }
   },
   "bin": {
-    "openai-usage-report": "./src/cli.ts"
+    "openai-and-claude-usage-report-generator": "./dist/cli.js",
+    "usage-report": "./dist/cli.js"
   },
   "files": [
     "dist",
@@ -28,6 +29,7 @@
     "test:ui": "vitest --ui",
     "test:run": "vitest run",
     "build": "tsc",
+    "postbuild": "node --input-type=module -e \"import fs from 'fs';const f='dist/cli.js';const c=fs.readFileSync(f,'utf8');fs.writeFileSync(f,'#!/usr/bin/env node\\n'+c.replace(/^#!.*\\n/,''))\"",
     "prepublishOnly": "yarn test:run && yarn build"
   },
   "keywords": [
@@ -42,6 +44,14 @@
   ],
   "author": "",
   "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ericdahl-dev/openai-and-claude-usage-report-generator.git"
+  },
+  "homepage": "https://github.com/ericdahl-dev/openai-and-claude-usage-report-generator#readme",
+  "bugs": {
+    "url": "https://github.com/ericdahl-dev/openai-and-claude-usage-report-generator/issues"
+  },
   "dependencies": {
     "axios": "^1.6.0",
     "dotenv": "^17.2.3"

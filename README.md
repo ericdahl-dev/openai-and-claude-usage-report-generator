@@ -1,4 +1,4 @@
-# OpenAI Usage Report Generator
+# OpenAI and Claude Usage Report Generator
 
 A CLI tool and library for generating billing reports from the **OpenAI** or **Claude (Anthropic)** cost APIs. Outputs Markdown (readable) and CSV (data) reports.
 
@@ -16,8 +16,12 @@ Can be used as:
 ## Prerequisites
 
 - Node.js 18+ and Yarn (`.nvmrc` specifies 22)
-- **OpenAI**: API admin key, Organization ID, and Project ID
-- **Claude**: Anthropic **Admin API key** (`sk-ant-admin...`). Standard API keys do not work; create one in [Console → Settings → Admin keys](https://console.anthropic.com/settings/admin-keys).
+- **OpenAI**: **Admin API key** (not a standard API key), Organization ID, and Project ID
+  - ⚠️ **Important**: Standard API keys do not work. You need an admin key with organization access.
+  - Create one in [OpenAI Platform → Settings → Organization → API keys](https://platform.openai.com/api-keys)
+- **Claude**: Anthropic **Admin API key** (`sk-ant-admin...`)
+  - ⚠️ **Important**: Standard API keys do not work. You need an admin key.
+  - Create one in [Console → Settings → Admin keys](https://console.anthropic.com/settings/admin-keys)
 
 ## Installation
 
@@ -25,26 +29,28 @@ Can be used as:
 
 ```bash
 git clone <repository-url>
-cd openai-usage-report
+cd openai-and-claude-usage-report-generator
 yarn install
 ```
 
 ### As an npm Package (Library)
 
 ```bash
-yarn add openai-usage-report
+yarn add openai-and-claude-usage-report-generator
 # or
-npm install openai-usage-report
+npm install openai-and-claude-usage-report-generator
 ```
 
 ## Configuration
 
 Create a `.env` file in the root directory (see `.env.example` for a template).
 
+⚠️ **Important**: Both platforms require **admin/administrative API keys**. Standard API keys will not work.
+
 **OpenAI** (default):
 
 ```env
-OPENAI_ADMIN_KEY=sk-...
+OPENAI_ADMIN_KEY=sk-...          # Must be an admin key, not a standard API key
 OPENAI_ORG_ID=org-...
 OPENAI_PROJECT_ID=proj_...
 ```
@@ -52,7 +58,7 @@ OPENAI_PROJECT_ID=proj_...
 **Claude**:
 
 ```env
-ANTHROPIC_ADMIN_API_KEY=sk-ant-admin-...
+ANTHROPIC_ADMIN_API_KEY=sk-ant-admin-...  # Must be an admin key (starts with sk-ant-admin), not a standard API key
 ```
 
 ## Usage
@@ -82,16 +88,17 @@ import {
   parseDate,
   validateDateRange,
   loadConfig,
-} from 'openai-usage-report';
-import type { OpenAIReportConfig, ClaudeReportConfig } from 'openai-usage-report';
+} from 'openai-and-claude-usage-report-generator';
+import type { OpenAIReportConfig, ClaudeReportConfig } from 'openai-and-claude-usage-report-generator';
 
 // Example: Fetch and process OpenAI costs
+// Note: OPENAI_ADMIN_KEY must be an admin key, not a standard API key
 async function generateOpenAIReport() {
   const config: OpenAIReportConfig = {
     provider: 'openai',
     startDate: '2024-01-01',
     endDate: '2024-01-31',
-    apiKey: process.env.OPENAI_ADMIN_KEY!,
+    apiKey: process.env.OPENAI_ADMIN_KEY!,  // Must be an admin key
     orgId: process.env.OPENAI_ORG_ID!,
     projectId: process.env.OPENAI_PROJECT_ID!,
   };
@@ -118,12 +125,13 @@ async function generateOpenAIReport() {
 }
 
 // Example: Fetch and process Claude costs
+// Note: ANTHROPIC_ADMIN_API_KEY must be an admin key (sk-ant-admin...), not a standard API key
 async function generateClaudeReport() {
   const config: ClaudeReportConfig = {
     provider: 'claude',
     startDate: '2024-01-01',
     endDate: '2024-01-31',
-    apiKey: process.env.ANTHROPIC_ADMIN_API_KEY!,
+    apiKey: process.env.ANTHROPIC_ADMIN_API_KEY!,  // Must be an admin key (starts with sk-ant-admin)
   };
 
   const buckets = await fetchClaudeCosts(config);
@@ -135,6 +143,8 @@ async function generateClaudeReport() {
 ```
 
 **Note**: When using as a library, you need to handle environment variables yourself. The `loadConfig` function is available but requires environment variables to be set, or you can construct the config objects directly as shown above.
+
+⚠️ **Important Reminder**: Both platforms require **admin/administrative API keys**. Standard API keys will not work for accessing cost/usage data.
 
 ## Output
 
