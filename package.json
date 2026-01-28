@@ -1,6 +1,6 @@
 {
   "name": "@ericdahl.dev/openai-and-claude-usage-report-generator",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "description": "OpenAI and Claude API Usage Report Generator - CLI tool and library for generating billing reports",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
