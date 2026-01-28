@@ -36,6 +36,13 @@ jobs:
       - name: Build project
         run: yarn build
 
+      - name: Verify npm version and OIDC setup
+        run: |
+          echo "npm version: $(npm --version)"
+          echo "Node version: $(node --version)"
+          # npm 11.5.1+ is required for OIDC trusted publishing
+
       - name: Publish to npm
         run: npm publish --access public --provenance
         # OIDC authentication happens automatically with trusted publishing
+        # Make sure trusted publisher is configured at: https://www.npmjs.com/settings/ericdahl-dev/oauth-applications
