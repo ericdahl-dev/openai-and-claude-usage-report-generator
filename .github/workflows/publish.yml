@@ -24,9 +24,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          registry-url: 'https://registry.npmjs.org'
           cache: 'yarn'
-          # OIDC trusted publishing - no token needed!
+          # OIDC trusted publishing - no registry-url or token needed!
 
       - name: Install dependencies
         run: yarn install --frozen-lockfile
