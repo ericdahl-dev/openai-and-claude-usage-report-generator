@@ -39,6 +39,12 @@ jobs:
       - name: Build project
         run: yarn build
 
+      - name: Configure npm for OIDC
+        run: |
+          npm config set registry https://registry.npmjs.org/
+          npm config set //registry.npmjs.org/:_authToken ""
+        # OIDC will be used automatically when publishing
+
       - name: Release
         run: npx semantic-release
         env:
