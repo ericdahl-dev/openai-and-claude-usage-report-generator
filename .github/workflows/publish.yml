@@ -1,0 +1,60 @@
+name: Publish to npm
+
+on:
+  push:
+    tags:
+      - 'v*'  # Triggers on version tags like v1.2.3
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write  # Required for npm provenance
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Need full history for npm version
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "yarn"
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Run tests
+        run: yarn test:run
+
+      - name: Build
+        run: yarn build
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Publishing version: $VERSION"
+
+      - name: Verify package version matches tag
+        run: |
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          TAG_VERSION="${{ steps.version.outputs.version }}"
+          if [ "$PACKAGE_VERSION" != "$TAG_VERSION" ]; then
+            echo "Error: package.json version ($PACKAGE_VERSION) doesn't match tag version ($TAG_VERSION)"
+            exit 1
+          fi
+          echo "✓ Version match confirmed: $PACKAGE_VERSION"
+
+      - name: Publish to npm
+        run: npm publish --access public --provenance
+
+      - name: Verify publication
+        run: |
+          sleep 5  # Give npm registry a moment to update
+          npm view @ericdahl.dev/openai-and-claude-usage-report-generator@${{ steps.version.outputs.version }} version

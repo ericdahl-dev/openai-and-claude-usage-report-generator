@@ -1,6 +1,79 @@
 # Publishing to npm
 
-## Prerequisites
+## Automated Publishing (Recommended)
+
+This repository uses **GitHub Actions** to automatically publish to npm when you push a version tag.
+
+### Setup (One-time)
+
+**Using npm Trusted Publishers (Recommended - Already Configured)**:
+
+This repository uses npm's Trusted Publishers feature with GitHub Actions OIDC, which means:
+- ✅ No npm tokens to manage or store
+- ✅ More secure - tokens are automatically generated per workflow run
+- ✅ Already configured - just push version tags to publish
+
+If you need to set up Trusted Publishers for a new repository:
+1. Go to https://www.npmjs.com/settings/YOUR_USERNAME/oauth-applications
+2. Click "Add GitHub Publisher"
+3. Select your GitHub organization/user and repository
+4. Configure the workflow name (e.g., `Publish to npm`) and workflow file path (e.g., `.github/workflows/publish.yml`)
+
+**Alternative: Using npm token** (if Trusted Publishers aren't available):
+1. Create an npm access token: https://www.npmjs.com/settings/YOUR_USERNAME/tokens
+2. Add it as `NPM_TOKEN` in GitHub Secrets
+3. Update the workflow to use `NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}`
+
+### How It Works
+
+When you push a version tag (e.g., `v1.2.3`), GitHub Actions will:
+1. ✅ Run tests (`yarn test:run`)
+2. ✅ Build the package (`yarn build`)
+3. ✅ Verify the package version matches the tag
+4. ✅ Publish to npm with provenance
+5. ✅ Verify the publication
+
+### Releasing a New Version
+
+**Option 1: Use the release scripts** (recommended - publishes automatically via GitHub Actions):
+
+```bash
+# Patch release (1.2.4 → 1.2.5) - bug fixes
+yarn release:patch
+
+# Minor release (1.2.4 → 1.3.0) - new features, backward compatible
+yarn release:minor
+
+# Major release (1.2.4 → 2.0.0) - breaking changes
+yarn release:major
+```
+
+These scripts will:
+1. Bump the version in `package.json`
+2. Create a git commit with the version change
+3. Create a git tag (e.g., `v1.2.5`)
+4. Push the commit and tag to GitHub
+5. **GitHub Actions automatically publishes to npm** 🚀
+
+**Option 2: Manual version bump** (for more control):
+
+```bash
+# Bump version
+npm version patch   # or minor, major
+
+# Push with tags
+git push --follow-tags
+
+# GitHub Actions will automatically publish
+```
+
+**Note**: The `release:*` scripts in `package.json` currently include `npm publish` locally. If you're using automated publishing, you can remove the `npm publish` part from those scripts and just push tags. However, keeping it allows for manual fallback if needed.
+
+## Manual Publishing (Fallback)
+
+If you need to publish manually (e.g., if GitHub Actions fails):
+
+### Prerequisites
 
 1. **npm account**: Create one at https://www.npmjs.com/signup if you don't have one
 2. **Login to npm**: Run `npm login` in your terminal
@@ -78,11 +151,11 @@ npm view @ericdahl.dev/openai-and-claude-usage-report-generator
 
 Or visit: https://www.npmjs.com/package/@ericdahl.dev/openai-and-claude-usage-report-generator
 
-## Updating the Package
+## Updating the Package (Manual)
 
-For subsequent releases, use the convenient npm scripts:
+For manual releases, use the convenient npm scripts:
 
-### Quick Release (Recommended)
+### Quick Release
 
 **One command to bump version, commit, tag, push, and publish:**
 
@@ -103,7 +176,9 @@ This automatically:
 3. Creates a git tag (e.g., `v1.0.1`)
 4. Pushes the commit and tag to GitHub
 5. Runs tests and builds (via `prepublishOnly`)
-6. Publishes to npm
+6. Publishes to npm locally
+
+**Note**: If using automated GitHub Actions publishing, you can modify these scripts to remove the `npm publish` step and rely on the workflow instead.
 
 ### Manual Version Bump (Alternative)
 
@@ -113,10 +188,10 @@ If you want more control:
    ```bash
    # Patch: 1.0.0 → 1.0.1
    npm version patch
-   
+
    # Minor: 1.0.0 → 1.1.0
    npm version minor
-   
+
    # Major: 1.0.0 → 2.0.0
    npm version major
    ```
