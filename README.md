@@ -107,7 +107,7 @@ async function generateOpenAIReport() {
 
   // Fetch cost data
   const buckets = await fetchOpenAICosts(config);
-  
+
   // Aggregate the data
   const aggregated = aggregateCosts(
     buckets,
@@ -115,15 +115,15 @@ async function generateOpenAIReport() {
     config.endDate,
     config.projectId
   );
-  
+
   // Generate reports
   const markdown = generateMarkdownReport(aggregated, config.orgId, 'openai');
   const csv = generateCSVReport(aggregated);
   const json = generateJSONReport(aggregated, config.orgId, 'openai');
-  
+
   // Or write directly to files
   const { mdPath, csvPath, jsonPath } = writeReports(aggregated, config.orgId, 'openai');
-  
+
   console.log(`Reports written to ${mdPath}, ${csvPath}, and ${jsonPath}`);
 }
 
@@ -140,7 +140,7 @@ async function generateClaudeReport() {
   const buckets = await fetchClaudeCosts(config);
   const aggregated = aggregateCosts(buckets, config.startDate, config.endDate, 'default');
   const markdown = generateMarkdownReport(aggregated, 'default', 'claude');
-  
+
   console.log(markdown);
 }
 ```
@@ -243,4 +243,3 @@ yarn build
 ### CI
 
 GitHub Actions runs on push and pull requests to `main`: `yarn install --frozen-lockfile`, `yarn test:run`, then `yarn build`. See [.github/workflows/ci.yml](.github/workflows/ci.yml).
-
