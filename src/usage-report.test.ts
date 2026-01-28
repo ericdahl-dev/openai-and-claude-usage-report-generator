@@ -279,6 +279,34 @@ describe('generateMarkdownReport', () => {
     expect(md).toContain('# Claude API Usage Report');
     expect(md).toContain('**Organization:** default');
   });
+
+  it('filters out 0.00 cost items', () => {
+    const a: AggregatedCosts = {
+      totalCost: 5,
+      startDate: '2024-01-01',
+      endDate: '2024-01-31',
+      projectId: 'proj_1',
+      dailyCosts: [
+        { date: '2024-01-01', lineItem: 'gpt-4', cost: 3 },
+        { date: '2024-01-01', lineItem: 'gpt-3.5', cost: 2 },
+        { date: '2024-01-01', lineItem: 'gpt-3.5-free', cost: 0 },
+        { date: '2024-01-02', lineItem: 'gpt-4-free', cost: 0.00 },
+      ],
+      costsByLineItem: new Map([
+        ['gpt-4', 3],
+        ['gpt-3.5', 2],
+        ['gpt-3.5-free', 0],
+        ['gpt-4-free', 0],
+      ]),
+      billingDays: 1,
+      averageDailyCost: 5,
+    };
+    const md = generateMarkdownReport(a, 'org-x', 'openai');
+    expect(md).toContain('gpt-4');
+    expect(md).toContain('gpt-3.5');
+    expect(md).not.toContain('gpt-3.5-free');
+    expect(md).not.toContain('gpt-4-free');
+  });
 });
 
 describe('generateCSVReport', () => {
@@ -303,6 +331,71 @@ describe('generateCSVReport', () => {
     expect(csv).toContain('date,line_item,cost_usd,project_id');
     expect(csv).toContain('2024-01-01,gpt-3.5,2.00,default');
     expect(csv).toContain('2024-01-01,gpt-4,3.00,default');
+  });
+
+  it('filters out 0.00 cost items', () => {
+    const a: AggregatedCosts = {
+      totalCost: 5,
+      startDate: '2024-01-01',
+      endDate: '2024-01-31',
+      projectId: 'default',
+      dailyCosts: [
+        { date: '2024-01-01', lineItem: 'gpt-4', cost: 3 },
+        { date: '2024-01-01', lineItem: 'gpt-3.5', cost: 2 },
+        { date: '2024-01-01', lineItem: 'gpt-3.5-free', cost: 0 },
+        { date: '2024-01-02', lineItem: 'gpt-4-free', cost: 0.00 },
+      ],
+      costsByLineItem: new Map([
+        ['gpt-4', 3],
+        ['gpt-3.5', 2],
+        ['gpt-3.5-free', 0],
+        ['gpt-4-free', 0],
+      ]),
+      billingDays: 1,
+      averageDailyCost: 5,
+    };
+    const csv = generateCSVReport(a);
+    expect(csv).toContain('date,line_item,cost_usd,project_id');
+    expect(csv).toContain('2024-01-01,gpt-3.5,2.00,default');
+    expect(csv).toContain('2024-01-01,gpt-4,3.00,default');
+    expect(csv).not.toContain('gpt-3.5-free');
+    expect(csv).not.toContain('gpt-4-free');
+  });
+
+  it('rounds up costs less than 0.01 to 0.01', () => {
+    const a: AggregatedCosts = {
+      totalCost: 5.005,
+      startDate: '2024-01-01',
+      endDate: '2024-01-31',
+      projectId: 'default',
+      dailyCosts: [
+        { date: '2024-01-01', lineItem: 'gpt-4', cost: 3 },
+        { date: '2024-01-01', lineItem: 'gpt-3.5', cost: 2 },
+        { date: '2024-01-01', lineItem: 'tiny-cost', cost: 0.005 },
+        { date: '2024-01-01', lineItem: 'very-tiny-cost', cost: 0.0001 },
+        { date: '2024-01-01', lineItem: 'zero-cost', cost: 0 },
+        { date: '2024-01-01', lineItem: 'exactly-0.01', cost: 0.01 },
+      ],
+      costsByLineItem: new Map([
+        ['gpt-4', 3],
+        ['gpt-3.5', 2],
+        ['tiny-cost', 0.005],
+        ['very-tiny-cost', 0.0001],
+        ['zero-cost', 0],
+        ['exactly-0.01', 0.01],
+      ]),
+      billingDays: 1,
+      averageDailyCost: 5.005,
+    };
+    const csv = generateCSVReport(a);
+    expect(csv).toContain('date,line_item,cost_usd,project_id');
+    expect(csv).toContain('2024-01-01,gpt-3.5,2.00,default');
+    expect(csv).toContain('2024-01-01,gpt-4,3.00,default');
+    expect(csv).toContain('tiny-cost,0.01');
+    expect(csv).toContain('very-tiny-cost,0.01');
+    expect(csv).toContain('exactly-0.01,0.01');
+    expect(csv).not.toContain('zero-cost');
+    expect(csv).not.toContain(',0.00,');
   });
 });
 
@@ -335,6 +428,9 @@ describe('generateJSONReport', () => {
     expect(parsed.metadata.billingPeriod.endDate).toBe('2024-01-31');
 
     expect(parsed.summary).toBeDefined();
+    expect(parsed.summary.billingPeriod).toBeDefined();
+    expect(parsed.summary.billingPeriod.startDate).toBe('2024-01-01');
+    expect(parsed.summary.billingPeriod.endDate).toBe('2024-01-31');
     expect(parsed.summary.totalCost).toBe(5);
     expect(parsed.summary.billingDays).toBe(1);
     expect(parsed.summary.averageDailyCost).toBe(5);
@@ -371,6 +467,100 @@ describe('generateJSONReport', () => {
     const json = generateJSONReport(a, 'default', 'claude');
     const parsed = JSON.parse(json);
     expect(parsed.metadata.provider).toBe('claude');
+  });
+
+  it('filters out 0.00 cost items', () => {
+    const a: AggregatedCosts = {
+      totalCost: 5,
+      startDate: '2024-01-01',
+      endDate: '2024-01-31',
+      projectId: 'proj_1',
+      dailyCosts: [
+        { date: '2024-01-01', lineItem: 'gpt-4', cost: 3 },
+        { date: '2024-01-01', lineItem: 'gpt-3.5', cost: 2 },
+        { date: '2024-01-01', lineItem: 'gpt-3.5-free', cost: 0 },
+        { date: '2024-01-02', lineItem: 'gpt-4-free', cost: 0.00 },
+      ],
+      costsByLineItem: new Map([
+        ['gpt-4', 3],
+        ['gpt-3.5', 2],
+        ['gpt-3.5-free', 0],
+        ['gpt-4-free', 0],
+      ]),
+      billingDays: 1,
+      averageDailyCost: 5,
+    };
+    const json = generateJSONReport(a, 'org-x', 'openai');
+    const parsed = JSON.parse(json);
+
+    expect(parsed.costsByLineItem.length).toBe(2);
+    expect(parsed.costsByLineItem.find((item: { lineItem: string }) => item.lineItem === 'gpt-3.5-free')).toBeUndefined();
+    expect(parsed.costsByLineItem.find((item: { lineItem: string }) => item.lineItem === 'gpt-4-free')).toBeUndefined();
+
+    expect(parsed.dailyBreakdown.length).toBe(2);
+    expect(parsed.dailyBreakdown.find((d: { lineItem: string }) => d.lineItem === 'gpt-3.5-free')).toBeUndefined();
+    expect(parsed.dailyBreakdown.find((d: { lineItem: string }) => d.lineItem === 'gpt-4-free')).toBeUndefined();
+
+    expect(parsed.dailyTotals.length).toBe(1);
+    expect(parsed.dailyTotals[0].total).toBe(5);
+  });
+
+  it('rounds up costs less than 0.01 to 0.01', () => {
+    const a: AggregatedCosts = {
+      totalCost: 5.005,
+      startDate: '2024-01-01',
+      endDate: '2024-01-31',
+      projectId: 'proj_1',
+      dailyCosts: [
+        { date: '2024-01-01', lineItem: 'gpt-4', cost: 3 },
+        { date: '2024-01-01', lineItem: 'gpt-3.5', cost: 2 },
+        { date: '2024-01-01', lineItem: 'tiny-cost', cost: 0.005 },
+        { date: '2024-01-01', lineItem: 'very-tiny-cost', cost: 0.0001 },
+        { date: '2024-01-01', lineItem: 'zero-cost', cost: 0 },
+        { date: '2024-01-01', lineItem: 'exactly-0.01', cost: 0.01 },
+      ],
+      costsByLineItem: new Map([
+        ['gpt-4', 3],
+        ['gpt-3.5', 2],
+        ['tiny-cost', 0.005],
+        ['very-tiny-cost', 0.0001],
+        ['zero-cost', 0],
+        ['exactly-0.01', 0.01],
+      ]),
+      billingDays: 1,
+      averageDailyCost: 5.005,
+    };
+    const json = generateJSONReport(a, 'org-x', 'openai');
+    const parsed = JSON.parse(json);
+
+    // Check costsByLineItem - should have rounded values
+    const tinyCostItem = parsed.costsByLineItem.find((item: { lineItem: string }) => item.lineItem === 'tiny-cost');
+    expect(tinyCostItem).toBeDefined();
+    expect(tinyCostItem.cost).toBe(0.01);
+
+    const veryTinyCostItem = parsed.costsByLineItem.find((item: { lineItem: string }) => item.lineItem === 'very-tiny-cost');
+    expect(veryTinyCostItem).toBeDefined();
+    expect(veryTinyCostItem.cost).toBe(0.01);
+
+    const exactlyItem = parsed.costsByLineItem.find((item: { lineItem: string }) => item.lineItem === 'exactly-0.01');
+    expect(exactlyItem).toBeDefined();
+    expect(exactlyItem.cost).toBe(0.01);
+
+    // Zero cost should be filtered out
+    const zeroCostItem = parsed.costsByLineItem.find((item: { lineItem: string }) => item.lineItem === 'zero-cost');
+    expect(zeroCostItem).toBeUndefined();
+
+    // Check dailyBreakdown
+    const tinyDaily = parsed.dailyBreakdown.find((d: { lineItem: string }) => d.lineItem === 'tiny-cost');
+    expect(tinyDaily).toBeDefined();
+    expect(tinyDaily.cost).toBe(0.01);
+
+    const veryTinyDaily = parsed.dailyBreakdown.find((d: { lineItem: string }) => d.lineItem === 'very-tiny-cost');
+    expect(veryTinyDaily).toBeDefined();
+    expect(veryTinyDaily.cost).toBe(0.01);
+
+    const zeroDaily = parsed.dailyBreakdown.find((d: { lineItem: string }) => d.lineItem === 'zero-cost');
+    expect(zeroDaily).toBeUndefined();
   });
 });
 

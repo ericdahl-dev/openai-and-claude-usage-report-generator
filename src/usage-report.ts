@@ -277,8 +277,13 @@ export function generateMarkdownReport(
     lines.push('| Model/Service | Total Cost | % of Total |');
     lines.push('|---------------|-----------|------------|');
 
-    // Sort by cost descending
+    // Sort by cost descending, filtering out 0.00 cost items and rounding up costs < 0.01
     const sortedLineItems = Array.from(aggregated.costsByLineItem.entries())
+      .map(([lineItem, cost]) => {
+        const normalizedCost = normalizeCost(cost);
+        return normalizedCost !== null ? [lineItem, normalizedCost] as const : null;
+      })
+      .filter((item): item is [string, number] => item !== null)
       .sort((a, b) => b[1] - a[1]);
 
     for (const [lineItem, cost] of sortedLineItems) {
@@ -296,7 +301,10 @@ export function generateMarkdownReport(
     lines.push('|------|---------------|-----------|');
 
     for (const daily of aggregated.dailyCosts) {
-      lines.push(`| ${daily.date} | ${daily.lineItem} | $${daily.cost.toFixed(2)} |`);
+      const normalizedCost = normalizeCost(daily.cost);
+      if (normalizedCost !== null) {
+        lines.push(`| ${daily.date} | ${daily.lineItem} | $${normalizedCost.toFixed(2)} |`);
+      }
     }
     lines.push('');
 
@@ -308,8 +316,11 @@ export function generateMarkdownReport(
 
     const dailyTotals = new Map<string, number>();
     for (const daily of aggregated.dailyCosts) {
-      const current = dailyTotals.get(daily.date) || 0;
-      dailyTotals.set(daily.date, current + daily.cost);
+      const normalizedCost = normalizeCost(daily.cost);
+      if (normalizedCost !== null) {
+        const current = dailyTotals.get(daily.date) || 0;
+        dailyTotals.set(daily.date, current + normalizedCost);
+      }
     }
 
     const sortedDates = Array.from(dailyTotals.entries()).sort((a, b) => a[0].localeCompare(b[0]));
@@ -336,18 +347,38 @@ function formatDateForReport(date: Date, includeYear: boolean): string {
   return `${month} ${day}`;
 }
 
+/**
+ * Rounds up costs less than 0.01 to 0.01.
+ * Filters out costs that are exactly 0.00 or less.
+ */
+function normalizeCost(cost: number): number | null {
+  if (cost <= 0) {
+    return null; // Filter out zero or negative costs
+  }
+  if (cost < 0.01) {
+    return 0.01; // Round up costs less than 0.01
+  }
+  return cost;
+}
+
 export function generateCSVReport(aggregated: AggregatedCosts): string {
   const lines: string[] = [];
 
   // Header
   lines.push('date,line_item,cost_usd,project_id');
 
-  // Sort by date then line item
-  const sortedDailyCosts = [...aggregated.dailyCosts].sort((a, b) => {
-    const dateCompare = a.date.localeCompare(b.date);
-    if (dateCompare !== 0) return dateCompare;
-    return a.lineItem.localeCompare(b.lineItem);
-  });
+  // Sort by date then line item, filtering out 0.00 cost items and rounding up costs < 0.01
+  const sortedDailyCosts = [...aggregated.dailyCosts]
+    .map(daily => {
+      const normalizedCost = normalizeCost(daily.cost);
+      return normalizedCost !== null ? { ...daily, cost: normalizedCost } : null;
+    })
+    .filter((daily): daily is DailyCost => daily !== null)
+    .sort((a, b) => {
+      const dateCompare = a.date.localeCompare(b.date);
+      if (dateCompare !== 0) return dateCompare;
+      return a.lineItem.localeCompare(b.lineItem);
+    });
 
   // Data rows
   for (const daily of sortedDailyCosts) {
@@ -359,20 +390,28 @@ export function generateCSVReport(aggregated: AggregatedCosts): string {
 }
 
 export function generateJSONReport(aggregated: AggregatedCosts, orgId: string, provider: 'openai' | 'claude'): string {
-  // Convert Map to array of objects for JSON serialization
+  // Convert Map to array of objects for JSON serialization, filtering out 0.00 cost items and rounding up costs < 0.01
   const costsByLineItem = Array.from(aggregated.costsByLineItem.entries())
-    .map(([lineItem, cost]) => ({
+    .map(([lineItem, cost]) => {
+      const normalizedCost = normalizeCost(cost);
+      return normalizedCost !== null ? { lineItem, cost: normalizedCost } : null;
+    })
+    .filter((item): item is { lineItem: string; cost: number } => item !== null)
+    .map(({ lineItem, cost }) => ({
       lineItem,
       cost,
       percentage: aggregated.totalCost > 0 ? (cost / aggregated.totalCost * 100) : 0,
     }))
     .sort((a, b) => b.cost - a.cost);
 
-  // Calculate daily totals
+  // Calculate daily totals (only for non-zero costs, with rounding)
   const dailyTotals = new Map<string, number>();
   for (const daily of aggregated.dailyCosts) {
-    const current = dailyTotals.get(daily.date) || 0;
-    dailyTotals.set(daily.date, current + daily.cost);
+    const normalizedCost = normalizeCost(daily.cost);
+    if (normalizedCost !== null) {
+      const current = dailyTotals.get(daily.date) || 0;
+      dailyTotals.set(daily.date, current + normalizedCost);
+    }
   }
 
   const dailyTotalsArray = Array.from(dailyTotals.entries())
@@ -391,17 +430,21 @@ export function generateJSONReport(aggregated: AggregatedCosts, orgId: string, p
       organizationId: orgId,
     },
     summary: {
+      billingPeriod: {
+        startDate: aggregated.startDate,
+        endDate: aggregated.endDate,
+      },
       totalCost: aggregated.totalCost,
       billingDays: aggregated.billingDays,
       averageDailyCost: aggregated.averageDailyCost,
     },
     costsByLineItem,
     dailyBreakdown: aggregated.dailyCosts
-      .map(d => ({
-        date: d.date,
-        lineItem: d.lineItem,
-        cost: d.cost,
-      }))
+      .map(d => {
+        const normalizedCost = normalizeCost(d.cost);
+        return normalizedCost !== null ? { date: d.date, lineItem: d.lineItem, cost: normalizedCost } : null;
+      })
+      .filter((d): d is { date: string; lineItem: string; cost: number } => d !== null)
       .sort((a, b) => {
         const dateCompare = a.date.localeCompare(b.date);
         if (dateCompare !== 0) return dateCompare;
