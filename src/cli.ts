@@ -2,10 +2,10 @@
 
 /**
  * CLI Entry Point
- * 
+ *
  * Command-line interface for generating usage reports.
  * Imports functionality from the library entry point.
- * 
+ *
  * Usage: yarn report YYYY-MM-DD YYYY-MM-DD [--provider openai|claude]
  */
 
@@ -15,6 +15,8 @@ import {
   fetchClaudeCosts,
   aggregateCosts,
   writeReports,
+  postJSONReport,
+  generateJSONReport,
   loadConfig,
   parseDate,
   validateDateRange,
@@ -23,18 +25,25 @@ import {
 } from './index.js';
 
 const USAGE =
-  'Usage: yarn report YYYY-MM-DD YYYY-MM-DD [--provider openai|claude]\n' +
+  'Usage: yarn report YYYY-MM-DD YYYY-MM-DD [--provider openai|claude] [--post-url URL]\n' +
   'Example: yarn report 2024-01-01 2024-01-31\n' +
-  'Example: yarn report 2024-01-01 2024-01-31 --provider claude';
+  'Example: yarn report 2024-01-01 2024-01-31 --provider claude\n' +
+  'Example: yarn report 2024-01-01 2024-01-31 --post-url https://example.com/api/reports';
 
-export function parseArguments(): { startDate: string; endDate: string; provider: Provider } {
+export function parseArguments(): { startDate: string; endDate: string; provider: Provider; postUrl?: string } {
   const args = process.argv.slice(2);
   const providerIdx = args.indexOf('--provider');
+  const postUrlIdx = args.indexOf('--post-url');
+  
   const providerArg = providerIdx >= 0 && args[providerIdx + 1] != null ? args[providerIdx + 1] : null;
-  const filtered =
-    providerIdx < 0
-      ? args
-      : args.filter((_, i) => i !== providerIdx && i !== providerIdx + 1);
+  const postUrlArg = postUrlIdx >= 0 && args[postUrlIdx + 1] != null ? args[postUrlIdx + 1] : null;
+  
+  // Filter out all flag arguments (only when flags are present)
+  const filtered = args.filter((_, i) => {
+    if (providerIdx >= 0 && (i === providerIdx || i === providerIdx + 1)) return false;
+    if (postUrlIdx >= 0 && (i === postUrlIdx || i === postUrlIdx + 1)) return false;
+    return true;
+  });
 
   if (filtered.length !== 2) {
     throw new Error(`Invalid arguments\n${USAGE}`);
@@ -51,7 +60,7 @@ export function parseArguments(): { startDate: string; endDate: string; provider
   const end = parseDate(endDate);
   validateDateRange(start, end);
 
-  return { startDate, endDate, provider };
+  return { startDate, endDate, provider, postUrl: postUrlArg || undefined };
 }
 
 function displayTerminalSummary(
@@ -91,7 +100,7 @@ function displayTerminalSummary(
 
 async function main() {
   try {
-    const { startDate, endDate, provider } = parseArguments();
+    const { startDate, endDate, provider, postUrl } = parseArguments();
     const config = loadConfig(startDate, endDate, provider);
 
     const title = provider === 'claude' ? 'Claude API Usage Report' : 'OpenAI API Usage Report';
@@ -109,6 +118,20 @@ async function main() {
     const orgId = config.provider === 'openai' ? config.orgId : 'default';
     const aggregated = aggregateCosts(buckets, startDate, endDate, projectId);
     const { mdPath, csvPath, jsonPath } = writeReports(aggregated, orgId, provider);
+    
+    // Optionally POST JSON to URL
+    if (postUrl) {
+      console.log(`Posting JSON report to ${postUrl}...`);
+      const jsonReport = generateJSONReport(aggregated, orgId, provider);
+      try {
+        await postJSONReport(jsonReport, postUrl);
+        console.log('Successfully posted JSON report\n');
+      } catch (error) {
+        console.error(`Failed to post JSON report: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        throw error;
+      }
+    }
+    
     console.log('');
     displayTerminalSummary(aggregated, mdPath, csvPath, jsonPath, provider);
   } catch (error) {

@@ -1,6 +1,6 @@
 /**
  * Library Entry Point
- * 
+ *
  * Exports all public API functions and types for programmatic use.
  * This is the main entry point when using this package as a library.
  */
@@ -30,6 +30,7 @@ export {
   generateCSVReport,
   generateJSONReport,
   writeReports,
+  postJSONReport,
   fetchOpenAICosts,
   fetchClaudeCosts,
 } from './usage-report.js';
