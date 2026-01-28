@@ -1,28 +1,24 @@
-name: Release
+name: Publish to npm
 
 on:
   push:
-    branches:
-      - main
+    tags:
+      - 'v*'
 
 permissions:
-  id-token: write  # Required for OIDC
+  id-token: write  # Required for OIDC trusted publishing
   contents: read
 
 jobs:
-  release:
+  publish:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      issues: write
-      pull-requests: write
       id-token: write  # Required for OIDC trusted publishing
+      contents: read
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Required for semantic-release
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -40,14 +36,6 @@ jobs:
       - name: Build project
         run: yarn build
 
-      - name: Configure npm for OIDC
-        run: |
-          npm config set registry https://registry.npmjs.org/
-          npm config set //registry.npmjs.org/:_authToken ""
-        # OIDC will be used automatically when publishing
-
-      - name: Release
-        run: npx semantic-release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # NPM_TOKEN not needed with OIDC trusted publishing
+      - name: Publish to npm
+        run: npm publish --access public --provenance
+        # OIDC authentication happens automatically with trusted publishing
