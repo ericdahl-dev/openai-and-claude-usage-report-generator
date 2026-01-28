@@ -36,11 +36,15 @@ jobs:
       - name: Build project
         run: yarn build
 
-      - name: Verify npm version and OIDC setup
+      - name: Upgrade npm for OIDC support
+        run: npm install -g npm@latest
+        # npm 11.5.1+ is required for OIDC trusted publishing
+        # Node.js 22 comes with npm 10.9.4, so we need to upgrade
+
+      - name: Verify npm version
         run: |
           echo "npm version: $(npm --version)"
           echo "Node version: $(node --version)"
-          # npm 11.5.1+ is required for OIDC trusted publishing
 
       - name: Publish to npm
         run: npm publish --access public --provenance
