@@ -24,6 +24,8 @@ jobs:
           node-version-file: ".nvmrc"
           cache: "yarn"
           registry-url: 'https://registry.npmjs.org'
+          # OIDC authentication is automatic with Trusted Publishers when id-token: write is set
+          # The action will automatically configure npm to use the OIDC token
 
       - name: Install dependencies
         run: yarn install --frozen-lockfile
@@ -50,6 +52,13 @@ jobs:
             exit 1
           fi
           echo "✓ Version match confirmed: $PACKAGE_VERSION"
+
+      - name: Verify npm configuration
+        run: |
+          echo "Checking npm registry configuration..."
+          npm config get registry
+          echo "Checking if package exists..."
+          npm view @ericdahl.dev/openai-and-claude-usage-report-generator@latest version 2>/dev/null || echo "Package does not exist yet (this is OK for first publish)"
 
       - name: Publish to npm
         run: npm publish --access public --provenance
