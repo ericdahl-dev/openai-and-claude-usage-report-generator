@@ -20,7 +20,8 @@
     "usage-report": "./dist/cli.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
   "scripts": {
     "report": "tsx src/cli.ts",
